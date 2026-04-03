@@ -8,12 +8,12 @@ export default function EnginePage() {
         <LightRays
           raysOrigin="top-center"
           raysColor="#ffffff"
-          raysSpeed={0.4}
+          raysSpeed={0.5}
           lightSpread={1.0}
           rayLength={3}
           followMouse={true}
-          mouseInfluence={0.05}
-          className="opacity-40"
+          mouseInfluence={0.1}
+          className="opacity-60"
         />
       </div>
 

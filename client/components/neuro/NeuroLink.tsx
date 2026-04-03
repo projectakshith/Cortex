@@ -132,7 +132,7 @@ export function NeuroLink() {
                  </pre>
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-white">
-                   <p className="text-[10px] uppercase tracking-[0.5em] opacity-20 font-mono text-center font-bold leading-loose">
+                   <p className="text-[10px] uppercase tracking-[0.5em] opacity-20 font-mono text-center leading-loose">
                      {isProcessing ? "Syncing..." : "Ready"}
                    </p>
                  </div>
