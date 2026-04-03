@@ -8,7 +8,15 @@ router.post('/evaluate-ui', async (req, res) => {
   }
 
   try {
-    res.json({ status: 'ok' })
+    const brainData = {
+      friction_score: 88,
+      regions: {
+        visual_cortex: 0.95,
+        prefrontal: 0.82
+      }
+    }
+
+    res.json(brainData)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
