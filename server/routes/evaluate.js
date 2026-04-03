@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const axios = require('axios')
 const model = require('../lib/gemini')
+const { diff } = require('../lib/cssDiff')
 
 const SYSTEM_PROMPT = `You are an expert accessibility engineer and UI designer. The provided React/Tailwind code has been mathematically proven to cause high cognitive overload and visual strain in human users. Your job is to refactor this code to drop the cognitive load to zero.
 
@@ -60,7 +61,8 @@ router.post('/evaluate-ui', async (req, res) => {
         severity: getSeverity(score),
         brain_regions: labeledRegions,
         ai_refactored: true,
-        clean_code: clean
+        clean_code: clean,
+        css_diff: diff(raw_code, clean)
       })
     }
 
