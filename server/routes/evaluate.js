@@ -28,6 +28,13 @@ router.post('/evaluate-ui', async (req, res) => {
 
     const score = brainData.friction_score
 
+    const getSeverity = (s) => {
+      if (s <= 25) return 'low'
+      if (s <= 50) return 'medium'
+      if (s <= 75) return 'high'
+      return 'critical'
+    }
+
     if (score > 40) {
       const result = await model.generateContent([
         { text: SYSTEM_PROMPT },
@@ -37,6 +44,7 @@ router.post('/evaluate-ui', async (req, res) => {
 
       return res.json({
         original_score: score,
+        severity: getSeverity(score),
         brain_regions: brainData.regions,
         ai_refactored: true,
         clean_code: clean
@@ -45,6 +53,7 @@ router.post('/evaluate-ui', async (req, res) => {
 
     res.json({
       original_score: score,
+      severity: getSeverity(score),
       brain_regions: brainData.regions,
       ai_refactored: false,
       clean_code: null,
