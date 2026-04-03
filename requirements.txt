@@ -1,11 +1,12 @@
-fastapi
-uvicorn
-pydantic
-python-dotenv
-google-genai
-torch 
-torchvision
-huggingface_hub
-tribev2 @ git+https://github.com/facebookresearch/tribev2.git
-torch 
-transformers
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+python-dotenv==1.0.1
+google-genai==0.3.0
+
+torch==2.5.1
+torchvision==0.20.1
+huggingface_hub==0.25.2
+transformers==4.45.2
+
+tribev2 @ git+https://github.com/facebookresearch/tribev2.git@72399081ed3f1040c4d996cefb2864a4c46f5b8e
