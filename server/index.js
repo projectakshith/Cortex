@@ -7,7 +7,9 @@ app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
 const evaluateRoute = require('./routes/evaluate')
+const healthRoute = require('./routes/health')
 app.use('/api', evaluateRoute)
+app.use('/api', healthRoute)
 
 const PORT = process.env.PORT || 3001
 
