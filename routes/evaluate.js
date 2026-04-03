@@ -18,10 +18,13 @@ router.post('/evaluate-ui', async (req, res) => {
   }
 
   try {
-    const brainRes = await axios.post(`${process.env.PRETHIV_API_URL}/analyze`, {
-      image_base64
-    })
-    const brainData = brainRes.data
+    const brainData = {
+      friction_score: 88,
+      regions: {
+        visual_cortex: 0.95,
+        prefrontal: 0.82
+      }
+    }
 
     const score = brainData.friction_score
 
