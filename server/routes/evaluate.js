@@ -47,7 +47,13 @@ router.post('/evaluate-ui', async (req, res) => {
       original_score: score,
       brain_regions: brainData.regions,
       ai_refactored: false,
-      clean_code: null
+      clean_code: null,
+      tips: [
+        'UI looks clean — cognitive load is low',
+        'Consider increasing font size for better readability',
+        'Ensure sufficient color contrast for accessibility',
+        'Keep interactive elements clearly distinguishable'
+      ]
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
