@@ -28,6 +28,19 @@ router.post('/evaluate-ui', async (req, res) => {
 
     const score = brainData.friction_score
 
+    const regionLabels = {
+      visual_cortex: 'Visual Overload',
+      prefrontal: 'Decision Fatigue',
+      amygdala: 'Stress Response',
+      hippocampus: 'Memory Load'
+    }
+
+    const labeledRegions = Object.fromEntries(
+      Object.entries(brainData.regions).map(([k, v]) => [
+        k, { score: v, label: regionLabels[k] || k }
+      ])
+    )
+
     const getSeverity = (s) => {
       if (s <= 25) return 'low'
       if (s <= 50) return 'medium'
@@ -45,7 +58,7 @@ router.post('/evaluate-ui', async (req, res) => {
       return res.json({
         original_score: score,
         severity: getSeverity(score),
-        brain_regions: brainData.regions,
+        brain_regions: labeledRegions,
         ai_refactored: true,
         clean_code: clean
       })
@@ -54,7 +67,7 @@ router.post('/evaluate-ui', async (req, res) => {
     res.json({
       original_score: score,
       severity: getSeverity(score),
-      brain_regions: brainData.regions,
+      brain_regions: labeledRegions,
       ai_refactored: false,
       clean_code: null,
       tips: [
