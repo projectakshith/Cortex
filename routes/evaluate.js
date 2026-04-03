@@ -29,11 +29,11 @@ router.post('/evaluate-ui', async (req, res) => {
     const score = brainData.friction_score
 
     if (score > 40) {
-      const clean = `<div style="background:#fff;border:3px solid #000;padding:16px;font-family:monospace;">
-  <h1 style="color:#000;font-size:1.5rem;border-bottom:2px solid #dd2b37;padding-bottom:8px;">Refactored UI</h1>
-  <p style="color:#000;">High contrast. Zero noise. Cognitive load eliminated.</p>
-  <button style="background:#dd2b37;color:#fff;border:none;padding:8px 16px;font-weight:bold;cursor:pointer;">Action</button>
-</div>`
+      const result = await model.generateContent([
+        { text: SYSTEM_PROMPT },
+        { text: raw_code }
+      ])
+      const clean = result.response.text()
 
       return res.json({
         original_score: score,
