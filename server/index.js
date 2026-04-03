@@ -8,8 +8,10 @@ app.use(express.json({ limit: '10mb' }))
 
 const evaluateRoute = require('./routes/evaluate')
 const healthRoute = require('./routes/health')
+const historyRoute = require('./routes/history')
 app.use('/api', evaluateRoute)
 app.use('/api', healthRoute)
+app.use('/api', historyRoute)
 
 const PORT = process.env.PORT || 3001
 
