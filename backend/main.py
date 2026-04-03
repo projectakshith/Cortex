@@ -18,7 +18,7 @@ from backend.services.scoring_service import get_tribe_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("NeuroLint Brain Node starting — pre-loading models...")
+    print("Cortex Brain Node starting — pre-loading models...")
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, get_tribe_model)   
     print("Model warm-up complete. Brain Node online.")
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     print("Brain Node shutting down.")
 
 app = FastAPI(
-    title="NeuroLint Brain Node",
+    title="Cortex Brain Node",
     description=(
         "In-Silico Cognitive Load Balancer. "
         "Scores UI components via Meta TRIBE v2 neural simulation "
@@ -52,7 +52,7 @@ def health_check():
         "llm_available": settings.GEMINI_API_KEY != "",
     }
 
-@app.post("/api/analyze", response_model=UIAnalysisResponse, tags=["NeuroLint"])
+@app.post("/api/analyze", response_model=UIAnalysisResponse, tags=["Cortex"])
 async def analyze_ui(request: UIAnalysisRequest):
     if not request.code.strip():
         raise HTTPException(status_code=400, detail="code field must not be empty.")
@@ -115,7 +115,7 @@ async def analyze_ui(request: UIAnalysisRequest):
 
 
 
-@app.post("/api/brain-score", response_model=BrainScoreResult, tags=["NeuroLint"])
+@app.post("/api/brain-score", response_model=BrainScoreResult, tags=["Cortex"])
 def brain_score(request: BrainScoreRequest):
     if not any([request.text, request.video_path, request.audio_path]):
         raise HTTPException(
@@ -130,12 +130,7 @@ def brain_score(request: BrainScoreRequest):
 
 def _demo_refactor_placeholder(original_code: str) -> str:
     return (
-        "// [DEMO MODE] Auto-refactored by NeuroLint Agent\n"
+        "// [DEMO MODE] Auto-refactored by Cortex Agent\n"
         "// Replace GEMINI_API_KEY and set DEMO_MODE=False for live refactoring.\n\n"
         + original_code
     )
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
