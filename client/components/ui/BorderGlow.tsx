@@ -133,11 +133,7 @@ export const BorderGlow: React.FC<BorderGlowProps> = ({
     card.classList.add('sweep-active');
     card.style.setProperty('--cursor-angle', `${angleStart}deg`);
 
-<<<<<<< HEAD
     animateValue({ duration: 500, onUpdate: v => card.style.setProperty('--edge-proximity', v) });
-=======
-    animateValue({ duration: 500, onUpdate: v => card.style.setProperty('--edge-proximity', v.toString()) });
->>>>>>> 3ef5f75dd11588bb6b20775708c5c680755e3af6
     animateValue({ ease: easeInCubic, duration: 1500, end: 50, onUpdate: v => {
       card.style.setProperty('--cursor-angle', `${(angleEnd - angleStart) * (v / 100) + angleStart}deg`);
     }});
@@ -145,11 +141,7 @@ export const BorderGlow: React.FC<BorderGlowProps> = ({
       card.style.setProperty('--cursor-angle', `${(angleEnd - angleStart) * (v / 100) + angleStart}deg`);
     }});
     animateValue({ ease: easeInCubic, delay: 2500, duration: 1500, start: 100, end: 0,
-<<<<<<< HEAD
       onUpdate: v => card.style.setProperty('--edge-proximity', v),
-=======
-      onUpdate: v => card.style.setProperty('--edge-proximity', v.toString()),
->>>>>>> 3ef5f75dd11588bb6b20775708c5c680755e3af6
       onEnd: () => card.classList.remove('sweep-active'),
     });
   }, [animated]);
