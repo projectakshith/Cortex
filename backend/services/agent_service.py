@@ -2,7 +2,7 @@ import re
 import base64
 from io import BytesIO
 from PIL import Image
-from backend.core.llm_client import model
+from backend.core.llm_client import client
 from backend.utils.text import clean_llm_output
 
 SYSTEM_PROMPT = """You are an expert accessibility engineer and UI designer building interfaces for high-performance aerospace systems (like SpaceX or Linear).
@@ -28,10 +28,13 @@ async def refactor_ui_code(raw_code: str, image_base64: str) -> str:
     
     try:
         ui_image = process_base64_image(image_base64)
-        response = await model.generate_content_async([prompt_text, ui_image])
+        response = await client.generate_content_async([prompt_text, ui_image])
         
     except Exception as e:
         print(f"Warning - Vision processing skipped/failed: {e}")
-        response = await model.generate_content_async(prompt_text)
+        response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=[prompt_text, ui_image]
+)
         
     return clean_llm_output(response.text)
