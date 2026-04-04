@@ -10,6 +10,7 @@ program
   .option('-i, --image <path>', 'Screenshot image (PNG/JPG)')
   .option('--server <url>', 'Server URL', 'http://localhost:3001')
   .option('-o, --output <path>', 'Write refactored code to file')
+  .option('--score <number>', 'Override friction score (demo mode)')
   .action((file, opts) => {
     if (!file) {
       program.help()

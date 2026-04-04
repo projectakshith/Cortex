@@ -53,7 +53,9 @@ module.exports = async function evaluate(opts) {
 
   let data
   try {
-    const res = await axios.post(`${opts.server}/api/evaluate-ui`, { raw_code, image_base64 })
+    const payload = { raw_code, image_base64 }
+    if (opts.score !== undefined) payload.demo_score = parseInt(opts.score)
+    const res = await axios.post(`${opts.server}/api/evaluate-ui`, payload)
     data = res.data
     spinner.stop()
   } catch (err) {

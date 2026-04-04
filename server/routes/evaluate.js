@@ -30,20 +30,28 @@ RULES:
 }
 
 router.post('/evaluate-ui', async (req, res) => {
-  const { raw_code, image_base64, style = 'brutalist' } = req.body
+  const { raw_code, image_base64, style = 'brutalist', demo_score } = req.body
 
   if (!raw_code) {
     return res.status(400).json({ error: 'missing fields' })
   }
 
   try {
-    const brainData = {
-      friction_score: 88,
-      regions: {
-        visual_cortex: 0.95,
-        prefrontal: 0.82
-      }
-    }
+    const brainData = demo_score !== undefined
+      ? {
+          friction_score: demo_score,
+          regions: {
+            visual_cortex: demo_score / 100,
+            prefrontal: demo_score / 100 * 0.85
+          }
+        }
+      : {
+          friction_score: 88,
+          regions: {
+            visual_cortex: 0.95,
+            prefrontal: 0.82
+          }
+        }
 
     const score = brainData.friction_score
 
