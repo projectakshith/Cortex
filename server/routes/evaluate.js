@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const axios = require('axios')
-const model = require('../lib/gemini')
+const { generate } = require('../lib/claude')
 const { diff } = require('../lib/cssDiff')
 
 const PROMPTS = {
@@ -77,11 +77,7 @@ router.post('/evaluate-ui', async (req, res) => {
 
     if (score > 40) {
       const prompt = PROMPTS[style] || PROMPTS.brutalist
-      const result = await model.generateContent([
-        { text: prompt },
-        { text: raw_code }
-      ])
-      const clean = result.response.text()
+      const clean = await generate(prompt, raw_code)
 
       return res.json({
         original_score: score,
