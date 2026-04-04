@@ -1,0 +1,15 @@
+{
+  "name": "cortex-cli",
+  "version": "1.0.0",
+  "description": "Cortex neuro-linter CLI",
+  "main": "bin/cortex.js",
+  "bin": {
+    "cortex": "./bin/cortex.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "ora": "^5.4.1"
+  }
+}

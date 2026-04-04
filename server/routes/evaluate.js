@@ -32,7 +32,7 @@ RULES:
 router.post('/evaluate-ui', async (req, res) => {
   const { raw_code, image_base64, style = 'brutalist' } = req.body
 
-  if (!raw_code || !image_base64) {
+  if (!raw_code) {
     return res.status(400).json({ error: 'missing fields' })
   }
 
