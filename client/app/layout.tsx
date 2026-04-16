@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { LenisProvider } from "@/components/providers/LenisProvider";
 
 const rostex = localFont({
   src: "../public/fonts/rostex/Rostex-Regular.ttf",
@@ -25,7 +26,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${rostex.variable} ${xirod.variable}`}>
       <body className="antialiased font-rostex text-foreground bg-background">
-        {children}
+        <LenisProvider>
+          {children}
+        </LenisProvider>
       </body>
     </html>
   );
