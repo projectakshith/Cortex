@@ -6,7 +6,9 @@ import numpy as np
 from io import BytesIO
 from PIL import Image
 import torchvision.transforms as transforms
+import torchvision.io
 from backend.models.schemas import BrainScoreRequest, BrainScoreResult
+from backend.core.tribe_client import get_tribe_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -18,22 +20,7 @@ preprocess = transforms.Compose([
 
 TRIBE_TIMEOUT_SECONDS = 30  
 
-_tribe_model = None
 _resnet_model = None
-
-def get_tribe_model():
-    global _tribe_model
-    if _tribe_model is None:
-        try:
-            from tribev2 import TribeModel
-            _tribe_model = TribeModel.from_pretrained(
-                "facebook/tribev2", cache_folder="./cache/tribe"
-            )
-            print("TRIBE v2 loaded successfully.")
-        except Exception as e:
-            print(f"WARNING: TRIBE v2 unavailable ({e}). ResNet fallback will be used.")
-            _tribe_model = "unavailable"    
-    return None if _tribe_model == "unavailable" else _tribe_model
 
 def get_resnet_model():
     global _resnet_model
@@ -44,14 +31,14 @@ def get_resnet_model():
     return _resnet_model
 
 
- 
-
 def _score_with_tribe(image: Image.Image) -> dict:
     import tempfile, os
     model = get_tribe_model()
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        image.save(tmp.name)
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        image_array = np.array(image.resize((224, 224)))
+        frames = torch.from_numpy(image_array).unsqueeze(0).repeat(30, 1, 1, 1)
+        torchvision.io.write_video(tmp.name, frames, fps=30)
         tmp_path = tmp.name
 
     try:
@@ -86,7 +73,6 @@ def _score_with_resnet(image_tensor: torch.Tensor) -> dict:
     return {"visual_cortex": visual, "prefrontal_cortex": prefron, "source": "resnet_fallback"}
 
 
-
 async def analyze_visual_strain(image_base64: str, raw_code: str) -> dict:
     image_data = re.sub(r'^data:image/.+;base64,', '', image_base64)
     image_bytes = base64.b64decode(image_data)
@@ -111,7 +97,7 @@ async def analyze_visual_strain(image_base64: str, raw_code: str) -> dict:
             print(f"TRIBE v2 error ({e}) — using ResNet fallback.")
 
     if scores is None:
-        scores = _score_with_resnet(tensor_input)
+        scores = await asyncio.get_event_loop().run_in_executor(None, _score_with_resnet, tensor_input)
         print(f"Fallback source: {scores['source']}")
 
     visual  = scores["visual_cortex"]
@@ -126,7 +112,6 @@ async def analyze_visual_strain(image_base64: str, raw_code: str) -> dict:
         },
         "scored_by": scores["source"],   
     }
-
 
 
 def compute_brain_score(req: BrainScoreRequest) -> BrainScoreResult:

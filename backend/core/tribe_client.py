@@ -1,5 +1,4 @@
 from functools import lru_cache
-from tribev2 import TribeModel
 import numpy as np
 
 ROI_INDICES = {
@@ -11,7 +10,15 @@ ROI_INDICES = {
 
 @lru_cache(maxsize=1)
 def get_tribe_model():
-    return TribeModel.from_pretrained("facebook/tribev2", cache_folder="./cache/tribe")
+    try:
+        from tribev2 import TribeModel
+        print("Loading TRIBE v2. This may take a while...")
+        model = TribeModel.from_pretrained("facebook/tribev2", cache_folder="./cache/tribe")
+        print("TRIBE v2 loaded successfully.")
+        return model
+    except Exception as e:
+        print(f"WARNING: TRIBE v2 unavailable ({e}). Fallback models will be used.")
+        return None
 
 def score_content(
     video_path: str = None,
@@ -20,6 +27,9 @@ def score_content(
 ) -> dict:
     
     model = get_tribe_model()
+    if not model:
+        raise RuntimeError("TRIBE v2 model is not available.")
+        
     df = model.get_events_dataframe(
         video_path=video_path,
         audio_path=audio_path,

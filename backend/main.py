@@ -13,7 +13,7 @@ from backend.models.schemas import (
 )
 from backend.services.scoring_service import analyze_visual_strain, compute_brain_score
 from backend.services.agent_service import refactor_ui_code
-from backend.services.scoring_service import get_tribe_model   
+from backend.core.tribe_client import get_tribe_model   
 
 
 @asynccontextmanager
