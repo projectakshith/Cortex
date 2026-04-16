@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { NeuroLink } from "@/components/neuro/NeuroLink";
 import { LightRays } from "@/components/ui/LightRays";
 
@@ -17,9 +18,16 @@ export default function EnginePage() {
         />
       </div>
 
-      <header className="relative z-30 px-12 py-10">
-        <h1 className="text-xl font-bold uppercase tracking-[0.4em]">CORTEX</h1>
-      </header>
+      <nav className="relative z-30 flex items-center justify-between px-12 py-8 border-b border-white/5">
+        <div className="flex items-center gap-12">
+          <h1 className="text-xl font-bold uppercase tracking-[0.4em]">CORTEX</h1>
+        </div>
+        
+        <div className="flex items-center gap-10 text-[10px] uppercase tracking-[0.2em] font-bold opacity-60">
+          <Link href="/engine" className="text-white opacity-100 underline underline-offset-8 decoration-accent-cyan">Engine</Link>
+          <Link href="/docs" className="hover:text-white transition-all cursor-pointer">Docs</Link>
+        </div>
+      </nav>
 
       <NeuroLink />
     </main>
