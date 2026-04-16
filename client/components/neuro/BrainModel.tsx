@@ -101,7 +101,7 @@ function CompositeModel() {
 
 export function BrainModel() {
   return (
-    <div className="w-full h-full relative cursor-grab active:cursor-grabbing hover:opacity-100 opacity-90 transition-opacity z-10 pointer-events-auto md:translate-x-[20%] md:-translate-y-[15%]">
+    <div className="w-full h-full relative cursor-grab active:cursor-grabbing hover:opacity-100 opacity-90 transition-opacity z-10 pointer-events-auto md:translate-x-[10%] md:-translate-y-[5%]">
       <Canvas
         camera={{ position: [0, 0, 160], fov: 50, near: 0.1, far: 3000 }}
         gl={{ antialias: true, alpha: true }}
