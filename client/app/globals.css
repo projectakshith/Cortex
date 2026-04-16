@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --font-smooch: var(--font-smooch), "Smooch Sans", sans-serif;
   --font-rostex: var(--font-rostex);
   --font-xirod: var(--font-xirod);
   --color-background: #000000;
@@ -19,6 +20,10 @@ body {
   min-height: 100vh;
   font-family: var(--font-rostex), sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+.font-smooch {
+  font-family: var(--font-smooch), "Smooch Sans", sans-serif;
 }
 
 .glass {

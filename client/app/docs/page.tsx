@@ -55,6 +55,12 @@ export default function Docs() {
             Engine
           </Link>
           <Link
+            href="/media"
+            className="hover:text-white transition-all cursor-pointer"
+          >
+            Media
+          </Link>
+          <Link
             href="/docs"
             className="text-white opacity-100 underline underline-offset-8 decoration-accent-cyan"
           >

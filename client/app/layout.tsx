@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Smooch_Sans } from "next/font/google";
 import "./globals.css";
 import { LenisProvider } from "@/components/providers/LenisProvider";
+
+const smoochSans = Smooch_Sans({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-smooch",
+  display: "swap",
+});
 
 const rostex = localFont({
   src: "../public/fonts/rostex/Rostex-Regular.ttf",
@@ -24,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${rostex.variable} ${xirod.variable}`}>
-      <body className="antialiased font-rostex text-foreground bg-background">
+    <html lang="en" className={`${smoochSans.variable} ${rostex.variable} ${xirod.variable}`}>
+      <body className="antialiased text-foreground bg-background">
         <LenisProvider>
           {children}
         </LenisProvider>

@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { NeuroLink } from "@/components/neuro/NeuroLink";
+import dynamic from "next/dynamic";
 import { LightRays } from "@/components/ui/LightRays";
 
-export default function EnginePage() {
+const MediaLink = dynamic(() => import("@/components/neuro/MediaLink").then(mod => mod.MediaLink), { ssr: false });
+
+export default function MediaPage() {
   return (
     <main className="relative min-h-screen flex flex-col font-rostex bg-[#030303] text-white overflow-x-hidden">
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -26,14 +30,14 @@ export default function EnginePage() {
         </div>
         
         <div className="flex items-center gap-10 text-[10px] uppercase tracking-[0.2em] font-bold opacity-60">
-          <Link href="/engine" className="text-white opacity-100 underline underline-offset-8 decoration-accent-cyan">Engine</Link>
-          <Link href="/media" className="hover:text-white transition-all cursor-pointer">Media</Link>
+          <Link href="/engine" className="hover:text-white transition-all cursor-pointer">Engine</Link>
+          <Link href="/media" className="text-white opacity-100 underline underline-offset-8 decoration-accent-cyan">Media</Link>
           <Link href="/docs" className="hover:text-white transition-all cursor-pointer">Docs</Link>
           <a href="https://github.com/projectakshith/Cortex" target="_blank" rel="noreferrer" className="hover:text-white transition-all cursor-pointer">GitHub</a>
         </div>
       </nav>
 
-      <NeuroLink />
+      <MediaLink />
     </main>
   );
 }
