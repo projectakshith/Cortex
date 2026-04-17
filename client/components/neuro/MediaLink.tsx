@@ -523,8 +523,8 @@ function ExpandedView({ isPlaying, videoPlayer, frames, extracting, videoSrc, on
       if (i < LOAD_STEPS.length - 1) setTimeout(tick, 420 + Math.random() * 260);
       else setTimeout(() => {
         setBrainVisible(true);
-        // Extra 1.2s after brain appears before frame strip slides in
-        setTimeout(() => setFramesReady(true), 1200);
+        // 3s after brain appears before real frame data slides in
+        setTimeout(() => setFramesReady(true), 3000);
       }, 400);
     };
     setTimeout(tick, 200);
@@ -587,7 +587,12 @@ function ExpandedView({ isPlaying, videoPlayer, frames, extracting, videoSrc, on
         </div>
 
         {/* Video + collapse — right strip */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col gap-4 p-5 border-l border-white/10">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.55, ease: "easeOut", delay: 0.15 }}
+          className="w-[380px] flex-shrink-0 flex flex-col gap-4 p-5 border-l border-white/10"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] tracking-[0.4em] uppercase opacity-40 font-mono">Neural Demo</span>
             <button onClick={onCollapse}
@@ -597,17 +602,12 @@ function ExpandedView({ isPlaying, videoPlayer, frames, extracting, videoSrc, on
           </div>
           <div>{videoPlayer}</div>
 
-          {/* Cognitive activity graph */}
-          <div className="border-t border-white/8 pt-4">
-            <CognitiveGraph progress={progress} activityCurve={activityCurve} />
-          </div>
-
           {!videoSrc && (
             <p className="text-[10px] font-mono opacity-25 leading-relaxed">
               Load a video — brain activates on play and frame analysis appears below.
             </p>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Gallery overlay */}
@@ -617,57 +617,65 @@ function ExpandedView({ isPlaying, videoPlayer, frames, extracting, videoSrc, on
         )}
       </AnimatePresence>
 
-      {/* ── Bottom strip: frames — slides in after brain loads ── */}
+      {/* ── Bottom strip: cognitive graph + frames ── */}
       <motion.div
-        initial={{ y: 60, opacity: 0 }}
-        animate={framesReady || (!brainLoading && videoSrc) ? { y: 0, opacity: 1 } : { y: 60, opacity: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="flex-shrink-0 border-t border-white/10 bg-black/80 backdrop-blur-md px-6 py-4"
+        initial={{ y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.55, ease: "easeOut", delay: 0.35 }}
+        className="flex-shrink-0 border-t border-white/10 bg-black/80 backdrop-blur-md"
       >
-      {/* inner wrapper keeps old structure ─────────────────────────── */}
-      <div className="contents">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Frame Analysis</span>
-          <span className="text-[9px] font-mono opacity-30">Predicted BOLD · 5 keyframes</span>
-          {frames.length > 0 && <span className="text-[9px] font-mono opacity-30 ml-auto">click frame to expand</span>}
-          {extracting && (
-            <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}
-              className="text-[9px] font-mono opacity-50 ml-1">extracting...</motion.span>
-          )}
+        <div className="flex min-h-0" style={{ height: 148 }}>
+
+          {/* Left: Cognitive graph — always visible */}
+          <div className="flex-shrink-0 flex flex-col justify-center px-6 py-4 border-r border-white/8" style={{ width: 300 }}>
+            <CognitiveGraph progress={progress} activityCurve={activityCurve} />
+          </div>
+
+          {/* Right: frame thumbnails */}
+          <div className="flex-1 flex flex-col justify-center px-5 py-4 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Frame Analysis</span>
+              <span className="text-[9px] font-mono opacity-30">5 keyframes</span>
+              {framesReady && frames.length > 0 && (
+                <span className="text-[9px] font-mono opacity-30 ml-auto">click to expand</span>
+              )}
+              {extracting && (
+                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}
+                  className="text-[9px] font-mono opacity-50 ml-1">extracting...</motion.span>
+              )}
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {(frames.length === 0 || !framesReady ? Array.from({ length: 5 }) : frames).map((frame, i) => (
+                frame == null ? (
+                  <div key={i} className="flex-shrink-0" style={{ width: 140 }}>
+                    <div className={`w-full aspect-video rounded-lg border border-white/8 ${extracting ? "bg-white/5 animate-pulse" : "bg-white/[0.03]"}`} />
+                  </div>
+                ) : (
+                  <motion.div key={i}
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.07, duration: 0.3 }}
+                    onClick={() => setGalleryIdx(i)}
+                    className="flex-shrink-0 cursor-pointer group" style={{ width: 140 }}
+                  >
+                    <div className="relative rounded-lg overflow-hidden border border-white/10 group-hover:border-white/40 transition-colors">
+                      <img src={(frame as Frame).dataUrl} alt="" className="w-full aspect-video object-cover group-hover:scale-[1.03] transition-transform duration-300" />
+                      <div className="absolute top-1 right-1 px-1 py-0.5 rounded bg-black/80 text-[9px] font-mono font-bold"
+                        style={{ color: (frame as Frame).suggestion.accent }}>{(frame as Frame).score}%</div>
+                      <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-black/70 text-[8px] font-mono opacity-60">{(frame as Frame).time.toFixed(1)}s</div>
+                      <div className="absolute inset-0 pointer-events-none"
+                        style={{ background: `linear-gradient(to top, ${(frame as Frame).suggestion.accent}22 0%, transparent 40%)` }} />
+                    </div>
+                    <p className="text-[8px] font-mono opacity-40 mt-1 truncate px-0.5"
+                      style={{ color: (frame as Frame).suggestion.accent }}>
+                      {(frame as Frame).suggestion.label}
+                    </p>
+                  </motion.div>
+                )
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-1">
-          {(frames.length === 0 ? Array.from({ length: 5 }) : frames).map((frame, i) => (
-            frame == null || frames.length === 0 ? (
-              <div key={i} className="flex-shrink-0 w-[190px] flex flex-col gap-2">
-                <div className="w-full aspect-video rounded-lg bg-white/5 animate-pulse border border-white/8" />
-                <div className="h-2.5 rounded bg-white/5 animate-pulse w-3/4" />
-                <div className="h-2 rounded bg-white/5 animate-pulse w-1/2" />
-              </div>
-            ) : (
-              <motion.div key={i}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07, duration: 0.35 }}
-                onClick={() => setGalleryIdx(i)}
-                className="flex-shrink-0 w-[190px] flex flex-col gap-2 cursor-pointer group"
-              >
-                <div className="relative rounded-lg overflow-hidden border border-white/10 group-hover:border-white/40 transition-colors">
-                  <img src={(frame as Frame).dataUrl} alt="" className="w-full aspect-video object-cover group-hover:scale-[1.03] transition-transform duration-300" />
-                  <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono font-bold"
-                    style={{ color: (frame as Frame).suggestion.accent }}>{(frame as Frame).score}%</div>
-                  <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono opacity-60">{(frame as Frame).time.toFixed(1)}s</div>
-                </div>
-                <div className="flex flex-col gap-0.5 px-0.5">
-                  <span className="text-[9px] font-bold tracking-widest uppercase truncate" style={{ color: (frame as Frame).suggestion.accent }}>
-                    {(frame as Frame).suggestion.label}
-                  </span>
-                  <p className="text-[9px] font-mono opacity-40 leading-relaxed line-clamp-2">{(frame as Frame).suggestion.desc}</p>
-                </div>
-              </motion.div>
-            )
-          ))}
-        </div>
-      </div>
-    </motion.div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -678,15 +686,30 @@ export function MediaLink() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef  = useRef<HTMLDivElement>(null);
 
-  const [videoSrc,   setVideoSrc]   = useState<string | null>(null);
-  const [isPlaying,  setIsPlaying]  = useState(false);
-  const [isMuted,    setIsMuted]    = useState(false);
-  const [speed,      setSpeed]      = useState<1 | 1.5 | 2>(1);
-  const [progress,   setProgress]   = useState(0);
+  const [videoSrc,    setVideoSrc]    = useState<string | null>(null);
+  const [isPlaying,   setIsPlaying]   = useState(false);
+  const [isMuted,     setIsMuted]     = useState(false);
+  const [speed,       setSpeed]       = useState<1 | 1.5 | 2>(1);
+  const [progress,    setProgress]    = useState(0);
+  const [videoAspect, setVideoAspect] = useState("16/9");
+  const [videoH,      setVideoH]      = useState(259);
+  const lastTimeRef      = useRef(0);
+  const resumeOnMountRef = useRef(false);
   const [isExpanded,   setIsExpanded]   = useState(false);
   const [frames,       setFrames]       = useState<Frame[]>([]);
   const [extracting,   setExtracting]   = useState(false);
   const [brainLoading, setBrainLoading] = useState(false);
+  const pendingAutoPlay = useRef(false);
+
+  // Auto-play fires only after brain loading completes
+  useEffect(() => {
+    if (!brainLoading && pendingAutoPlay.current) {
+      pendingAutoPlay.current = false;
+      setTimeout(() => {
+        videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+      }, 300);
+    }
+  }, [brainLoading]);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -696,12 +719,9 @@ export function MediaLink() {
     const url = URL.createObjectURL(file);
     setVideoSrc(url); setIsPlaying(false); setProgress(0); setFrames([]);
     setExtracting(true);
+    pendingAutoPlay.current = true;
     setBrainLoading(true);
     setTimeout(() => setBrainLoading(false), 2800);
-    // auto-play
-    setTimeout(() => {
-      videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
-    }, 100);
     setTimeout(async () => {
       try {
         const v = videoRef.current;
@@ -728,6 +748,22 @@ export function MediaLink() {
     setSpeed(s);
   };
 
+  const expandOpen = useCallback(() => {
+    if (videoRef.current) {
+      lastTimeRef.current = videoRef.current.currentTime;
+      resumeOnMountRef.current = isPlaying;
+    }
+    setIsExpanded(true);
+  }, [isPlaying]);
+
+  const expandClose = useCallback(() => {
+    if (videoRef.current) {
+      lastTimeRef.current = videoRef.current.currentTime;
+      resumeOnMountRef.current = isPlaying;
+    }
+    setIsExpanded(false);
+  }, [isPlaying]);
+
   const seekTo = (e: React.MouseEvent<HTMLDivElement>) => {
     const v = videoRef.current; const bar = progressRef.current;
     if (!v || !bar || !v.duration) return;
@@ -740,15 +776,38 @@ export function MediaLink() {
     const onEnded = () => setIsPlaying(false);
     v.addEventListener("timeupdate", onTime); v.addEventListener("ended", onEnded);
     return () => { v.removeEventListener("timeupdate", onTime); v.removeEventListener("ended", onEnded); };
-  }, [videoSrc]);
+  }, [videoSrc, isExpanded]);
 
   // ── Video player (shared between normal and expanded) ──────────────────────
   const VideoPlayer = (
     <div className="rounded-2xl border border-white/10 bg-[#0a0a0a] overflow-hidden flex-shrink-0">
-      <div className="relative bg-black" style={{ aspectRatio: "16/9" }}>
+      <div className="relative bg-black w-full" style={{ height: videoH }}>
         {videoSrc
           ? <>
-              <video ref={videoRef} src={videoSrc} className="w-full h-full object-cover" playsInline />
+              <video
+                ref={videoRef} src={videoSrc}
+                className="absolute inset-0 w-full h-full object-contain"
+                playsInline
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  if (v.videoWidth && v.videoHeight) {
+                    setVideoAspect(`${v.videoWidth}/${v.videoHeight}`);
+                    // cap height at 280px; panel is 460px wide
+                    setVideoH(Math.min(Math.round(460 * v.videoHeight / v.videoWidth), 280));
+                  }
+                }}
+                onCanPlay={() => {
+                  const v = videoRef.current; if (!v) return;
+                  if (lastTimeRef.current > 0) {
+                    v.currentTime = lastTimeRef.current;
+                    lastTimeRef.current = 0;
+                  }
+                  if (resumeOnMountRef.current) {
+                    v.play().then(() => setIsPlaying(true)).catch(() => {});
+                    resumeOnMountRef.current = false;
+                  }
+                }}
+              />
               {/* Change video button — top-right hover overlay */}
               <button onClick={() => fileInputRef.current?.click()}
                 className="absolute top-2 right-2 z-10 px-2.5 py-1 rounded-full border border-white/20 bg-black/60 backdrop-blur-sm text-[9px] font-mono tracking-widest uppercase opacity-0 hover:opacity-100 transition-opacity">
@@ -785,12 +844,16 @@ export function MediaLink() {
   );
 
   const RightPanel = (
-    <div className="flex-shrink-0 flex flex-col gap-4"
+    <motion.div
+      initial={{ opacity: 0, x: 28 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+      className="flex-shrink-0 flex flex-col gap-4"
       style={{ width: 460, position: "sticky", top: 0, height: "100vh", overflowY: "auto", paddingTop: 56, paddingBottom: 32 }}>
 
       {/* Compact brain panel */}
       <div className="relative rounded-2xl border border-white/10 bg-black overflow-hidden flex-shrink-0" style={{ height: 340 }}>
-        <button onClick={() => setIsExpanded(true)}
+        <button onClick={expandOpen}
           className="absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full border border-white/25 bg-black/70 text-[11px] tracking-widest uppercase hover:bg-white/10 transition-colors backdrop-blur-sm">
           <ExpandIcon /> Expand Demo
         </button>
@@ -808,8 +871,9 @@ export function MediaLink() {
         </div>
       </div>
 
-      {VideoPlayer}
-    </div>
+      {/* Only mount VideoPlayer here when NOT expanded — expanded overlay owns the ref */}
+      {!isExpanded && VideoPlayer}
+    </motion.div>
   );
 
   // ── Fullscreen expand overlay ───────────────────────────────────────────────
@@ -822,7 +886,7 @@ export function MediaLink() {
           frames={frames}
           extracting={extracting}
           videoSrc={videoSrc}
-          onCollapse={() => setIsExpanded(false)}
+          onCollapse={expandClose}
           brainLoading={brainLoading}
           progress={progress}
         />
@@ -836,9 +900,14 @@ export function MediaLink() {
 
       {/* ── TWO-COLUMN: intro + demo ── */}
       <div className="flex items-start w-full max-w-[1600px] mx-auto gap-10 px-10 pt-14">
-        <div className="flex-1 flex flex-col gap-20 pb-24">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          className="flex-1 flex flex-col gap-20 pb-24"
+        >
 
-          <Section>
+          <Section delay={0.3}>
             <h2 className="text-4xl font-bold tracking-tight uppercase mb-5">Scale</h2>
             <p className="text-sm leading-8 opacity-60 max-w-xl font-mono">
               For decades, neuroscience has faced a major bottleneck: the need for new brain recordings for every new experiment. This has made understanding brain mechanisms slow, costly, and difficult to scale and integrate.
@@ -848,7 +917,7 @@ export function MediaLink() {
             </p>
           </Section>
 
-          <Section>
+          <Section delay={0.1}>
             <h2 className="text-3xl font-bold tracking-tight mb-6">TRIBE v2: a three-stage architecture</h2>
             <p className="text-sm opacity-50 font-mono max-w-xl mb-7">TRIBE v2 predicts brain activity through a three-stage pipeline:</p>
             {[
@@ -893,7 +962,7 @@ export function MediaLink() {
             </div>
           </Section>
 
-        </div>
+        </motion.div>
         {RightPanel}
       </div>
 
@@ -981,42 +1050,63 @@ export function MediaLink() {
 
       </div>
 
-      {/* ── Frame analysis ── */}
-      <AnimatePresence>
-        {(frames.length > 0 || extracting) && (
-          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }} className="w-full border-t border-white/10 px-10 py-14">
-            <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
-              <div className="flex items-baseline gap-4">
-                <h3 className="text-2xl font-bold uppercase tracking-widest">Frame Analysis</h3>
-                <span className="text-[10px] tracking-[0.3em] uppercase opacity-40 font-mono">Predicted BOLD · 5 keyframes</span>
-              </div>
-              {extracting ? (
-                <div className="flex gap-4">{Array.from({ length: 5 }).map((_, i) =>
-                  <div key={i} className="flex-1 aspect-video rounded-xl bg-white/5 animate-pulse border border-white/10" />)}</div>
-              ) : (
-                <div className="flex gap-5 overflow-x-auto pb-2">
-                  {frames.map((frame, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1, duration: 0.5 }} className="flex-shrink-0 w-[280px] flex flex-col gap-3">
-                      <div className="relative rounded-xl overflow-hidden border border-white/10">
-                        <img src={frame.dataUrl} alt={`Frame ${i + 1}`} className="w-full aspect-video object-cover" />
-                        <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-[11px] font-mono font-bold"
-                          style={{ color: frame.suggestion.accent }}>{frame.score}%</div>
-                        <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-[10px] font-mono opacity-70">{frame.time.toFixed(1)}s</div>
-                      </div>
-                      <div className="rounded-xl border bg-black/40 p-4 flex flex-col gap-2" style={{ borderColor: `${frame.suggestion.accent}30` }}>
-                        <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: frame.suggestion.accent }}>{frame.suggestion.label}</span>
-                        <p className="text-[11px] font-mono opacity-55 leading-relaxed">{frame.suggestion.desc}</p>
-                      </div>
-                    </motion.div>
-                  ))}
+      {/* ── Frame analysis — always visible ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 32 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+        className="w-full border-t border-white/10 px-10 py-14"
+      >
+        <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
+          <div className="flex items-baseline gap-4">
+            <h3 className="text-2xl font-bold uppercase tracking-widest">Frame Analysis</h3>
+            <span className="text-[10px] tracking-[0.3em] uppercase opacity-40 font-mono">Predicted BOLD · 5 keyframes</span>
+            {extracting && (
+              <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}
+                className="text-[9px] font-mono opacity-50 ml-2">extracting...</motion.span>
+            )}
+          </div>
+          <div className="flex gap-5 overflow-x-auto pb-2">
+            {(frames.length === 0 ? Array.from({ length: 5 }) : frames).map((frame, i) =>
+              frame == null ? (
+                <div key={i} className="flex-shrink-0 w-[280px] flex flex-col gap-3">
+                  <div className={`w-full aspect-video rounded-xl border border-white/8 ${extracting ? "bg-white/5 animate-pulse" : "bg-white/[0.03]"}`} />
+                  <div className={`rounded-xl border border-white/5 p-4 flex flex-col gap-3 ${extracting ? "bg-black/20" : "bg-black/10"}`}>
+                    <div className={`h-2.5 rounded w-2/3 ${extracting ? "bg-white/8 animate-pulse" : "bg-white/[0.04]"}`} />
+                    <div className={`h-2 rounded w-full ${extracting ? "bg-white/5 animate-pulse" : "bg-white/[0.03]"}`} />
+                    <div className={`h-2 rounded w-4/5 ${extracting ? "bg-white/5 animate-pulse" : "bg-white/[0.03]"}`} />
+                  </div>
                 </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              ) : (
+                <motion.div key={i}
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="flex-shrink-0 w-[280px] flex flex-col gap-3"
+                >
+                  <div className="relative rounded-xl overflow-hidden border border-white/10">
+                    <img src={(frame as Frame).dataUrl} alt={`Frame ${i + 1}`} className="w-full aspect-video object-cover" />
+                    <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-[11px] font-mono font-bold"
+                      style={{ color: (frame as Frame).suggestion.accent }}>{(frame as Frame).score}%</div>
+                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-[10px] font-mono opacity-70">{(frame as Frame).time.toFixed(1)}s</div>
+                  </div>
+                  <div className="rounded-xl border bg-black/40 p-4 flex flex-col gap-2" style={{ borderColor: `${(frame as Frame).suggestion.accent}30` }}>
+                    <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: (frame as Frame).suggestion.accent }}>{(frame as Frame).suggestion.label}</span>
+                    <p className="text-[11px] font-mono opacity-55 leading-relaxed">{(frame as Frame).suggestion.desc}</p>
+                  </div>
+                </motion.div>
+              )
+            )}
+          </div>
+          {!videoSrc && (
+            <motion.p
+              initial={{ opacity: 0 }} animate={{ opacity: 0.2 }} transition={{ delay: 0.4 }}
+              className="text-[11px] font-mono tracking-widest uppercase text-center"
+            >
+              Upload a video to begin analysis
+            </motion.p>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
