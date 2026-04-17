@@ -1,166 +1,393 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { GlassPanel } from "@/components/ui/GlassPanel";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 
-const SolidHeatmapBrain = dynamic(() => import("@/components/neuro/BrainModel").then(mod => mod.SolidHeatmapBrain), { ssr: false });
-const HUDHeadModel = dynamic(() => import("@/components/neuro/BrainModel").then(mod => mod.HUDHeadModel), { ssr: false });
+const RandomHeatmapBrain = dynamic(
+  () => import("@/components/neuro/BrainModel").then((m) => m.RandomHeatmapBrain),
+  { ssr: false }
+);
 
+// ── Suggestion pool ──────────────────────────────────────────────────────────
+const SUGGESTIONS = [
+  { label: "Visual Cortex Peak", desc: "Strong V1/V2 activation. High visual complexity — consider reducing motion density.", accent: "#ef4444" },
+  { label: "Attention Density: High", desc: "Prefrontal engagement elevated. Clear focal object detected — preserve this framing.", accent: "#f97316" },
+  { label: "Motion Overload Detected", desc: "MT+ region saturated. Slow the cut rate or reduce optical flow intensity.", accent: "#eab308" },
+  { label: "Low Cognitive Load", desc: "Resting-state signal. Optimal moment to introduce key messaging or CTA.", accent: "#22c55e" },
+  { label: "Temporal Cortex Engaged", desc: "Auditory-visual sync confirmed. Maintain audio cue alignment with visual beats.", accent: "#06b6d4" },
+  { label: "Decision Fatigue Signal", desc: "dlPFC overload detected. Simplify on-screen choices — reduce competing elements.", accent: "#a855f7" },
+];
+
+type Frame = { dataUrl: string; time: number; score: number; suggestion: (typeof SUGGESTIONS)[number] };
+
+// ── Frame extractor ──────────────────────────────────────────────────────────
+async function extractFrames(src: string, duration: number): Promise<Frame[]> {
+  const offscreen = document.createElement("video");
+  offscreen.src = src;
+  offscreen.muted = true;
+  offscreen.preload = "metadata";
+  await new Promise<void>((res) => offscreen.addEventListener("loadedmetadata", () => res(), { once: true }));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 480;
+  canvas.height = 270;
+  const ctx = canvas.getContext("2d")!;
+
+  const count = 5;
+  const timestamps = Array.from({ length: count }, (_, i) => ((i + 0.5) / count) * duration);
+  const frames: Frame[] = [];
+
+  for (const ts of timestamps) {
+    offscreen.currentTime = ts;
+    await new Promise<void>((res) => offscreen.addEventListener("seeked", () => res(), { once: true }));
+    ctx.drawImage(offscreen, 0, 0, 480, 270);
+    frames.push({
+      dataUrl: canvas.toDataURL("image/jpeg", 0.82),
+      time: ts,
+      score: Math.floor(Math.random() * 38 + 58),
+      suggestion: SUGGESTIONS[Math.floor(Math.random() * SUGGESTIONS.length)],
+    });
+  }
+
+  offscreen.src = "";
+  return frames;
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 export function MediaLink() {
-  const [media, setMedia] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [metrics, setResultMetrics] = useState({ 
-    score: 0, 
-    recall: 0, 
-    saturation: 0,
-    timeline: Array(20).fill(0) 
-  });
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const progressRef   = useRef<HTMLDivElement>(null);
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [videoSrc,   setVideoSrc]   = useState<string | null>(null);
+  const [isPlaying,  setIsPlaying]  = useState(false);
+  const [isMuted,    setIsMuted]    = useState(false);
+  const [speed,      setSpeed]      = useState<1 | 1.5 | 2>(1);
+  const [progress,   setProgress]   = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [frames,     setFrames]     = useState<Frame[]>([]);
+  const [extracting, setExtracting] = useState(false);
+
+  // ── Video handlers ─────────────────────────────────────────────────────────
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setMedia(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setVideoSrc(url);
+    setIsPlaying(false);
+    setProgress(0);
+    setFrames([]);
+    setExtracting(true);
+    // Extract frames after a tick so video element can load
+    setTimeout(async () => {
+      try {
+        const v = videoRef.current;
+        const dur = v?.duration && isFinite(v.duration) ? v.duration : 30;
+        const f = await extractFrames(url, dur);
+        setFrames(f);
+      } finally {
+        setExtracting(false);
+      }
+    }, 600);
   };
 
-  const clearMedia = () => {
-    setMedia(null);
-    setResultMetrics({ score: 0, recall: 0, saturation: 0, timeline: Array(20).fill(0) });
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (isPlaying) { v.pause(); setIsPlaying(false); }
+    else           { v.play();  setIsPlaying(true);  }
+  }, [isPlaying]);
+
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !isMuted;
+    setIsMuted(!isMuted);
   };
 
-  const triggerAnalysis = async () => {
-    if (!media) return;
-    setIsProcessing(true);
-    setResultMetrics({ score: 0, recall: 0, saturation: 0, timeline: Array(20).fill(0) });
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 3500));
-      
-      const score = Math.floor(Math.random() * (98 - 75 + 1) + 75);
-      const recall = Math.floor(Math.random() * (95 - 60 + 1) + 60);
-      const saturation = Math.floor(Math.random() * (80 - 40 + 1) + 40);
-      const timeline = Array.from({ length: 20 }, () => Math.random() * 100);
-
-      setResultMetrics({ score, recall, saturation, timeline });
-    } catch (err) {
-      console.warn("Analysis Failed");
-    } finally {
-      setIsProcessing(false);
-    }
+  const cycleSpeed = () => {
+    const next: Record<number, 1 | 1.5 | 2> = { 1: 1.5, 1.5: 2, 2: 1 };
+    const s = next[speed];
+    if (videoRef.current) videoRef.current.playbackRate = s;
+    setSpeed(s);
   };
 
+  const seekTo = (e: React.MouseEvent<HTMLDivElement>) => {
+    const v = videoRef.current;
+    const bar = progressRef.current;
+    if (!v || !bar || !v.duration) return;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - bar.getBoundingClientRect().left) / bar.offsetWidth));
+    v.currentTime = ratio * v.duration;
+  };
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onTime  = () => setProgress(v.duration ? v.currentTime / v.duration : 0);
+    const onEnded = () => setIsPlaying(false);
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("ended", onEnded);
+    return () => { v.removeEventListener("timeupdate", onTime); v.removeEventListener("ended", onEnded); };
+  }, [videoSrc]);
+
+  // ── Layout ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col lg:flex-row w-full max-w-[1800px] mx-auto gap-8 px-8 py-12 relative z-10 min-h-[85vh] font-rostex uppercase text-white overflow-hidden">
-      
-      {/* LEFT PANEL: The Naked Naked Solid BOLD Anatomy (65%) */}
-      <div className="flex-1 lg:flex-[2.5] flex flex-col gap-6 relative">
-        <GlassPanel className="flex-1 flex flex-col min-h-[600px] rounded-[2rem] bg-black/80 border border-white/20 relative overflow-hidden backdrop-blur-2xl">
-          <div className="absolute top-6 left-6 z-20 flex items-center gap-4">
-             <button className="px-4 py-2 rounded-full border border-white/40 text-xs font-smooch font-bold hover:bg-white hover:text-black transition-colors pointer-events-auto mix-blend-difference">Show Guide</button>
-          </div>
-          
-          <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-1 opacity-80 mix-blend-difference">
-             <span className="text-[10px] tracking-widest font-smooch font-bold">Low</span>
-             <div className="w-32 h-[3px] rounded-full bg-gradient-to-r from-red-600 via-orange-500 to-yellow-300" />
-             <span className="text-[10px] tracking-widest font-smooch font-bold w-full text-right">High</span>
-             <span className="text-[10px] tracking-widest font-smooch opacity-50">BOLD Activity</span>
+    <div className="flex flex-col w-full text-white">
+
+      {/* ── Top row ── */}
+      <div className="flex w-full max-w-[1600px] mx-auto gap-10 px-10 py-14 min-h-[85vh]">
+
+        {/* LEFT: text OR expanded brain */}
+        <AnimatePresence mode="wait">
+          {isExpanded ? (
+            <motion.div
+              key="brain-expanded"
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.4 }}
+              className="flex-1 rounded-2xl border border-white/10 bg-black overflow-hidden"
+              style={{ minHeight: "75vh" }}
+            >
+              <RandomHeatmapBrain isActive={isPlaying} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="text"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 flex flex-col gap-14 overflow-y-auto pr-4 max-h-[calc(100vh-120px)]"
+            >
+              <section className="flex flex-col gap-5">
+                <h2 className="text-4xl font-bold tracking-tight uppercase">Scale</h2>
+                <p className="text-sm leading-8 opacity-60 max-w-xl font-mono">
+                  For decades, neuroscience has faced a major bottleneck: the need for new brain recordings for every new experiment. This has made understanding brain mechanisms slow, costly, and difficult to scale and integrate.
+                </p>
+                <p className="text-sm leading-8 opacity-60 max-w-xl font-mono">
+                  Today, Cortex leverages TRIBE v2 — a foundation model that acts as a digital mirror of human brain activity in response to sight, sound and language, transforming months of lab work into seconds of computation.
+                </p>
+              </section>
+
+              <section className="flex flex-col gap-7">
+                <h2 className="text-3xl font-bold tracking-tight">TRIBE v2: a three-stage architecture</h2>
+                <p className="text-sm opacity-50 font-mono max-w-xl">TRIBE v2 predicts brain activity through a three-stage pipeline:</p>
+                {[
+                  { n: "1", title: "Tri-modal Encoding",      body: "Pretrained audio, video and text embeddings capture the features shared by AI models and the human brain." },
+                  { n: "2", title: "Universal Integration",   body: "A transformer learns universal representations shared across all stimuli, tasks, and individuals." },
+                  { n: "3", title: "Brain Mapping",           body: "A subject layer maps representations onto individual fMRI voxels — 3D pixels that track neural activity via blood-oxygen changes." },
+                ].map((item) => (
+                  <div key={item.n} className="flex gap-5 items-start">
+                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[11px] font-bold">{item.n}</span>
+                    <p className="text-sm font-mono leading-7 opacity-60 max-w-lg">
+                      <strong className="text-white font-bold">{item.title}: </strong>{item.body}
+                    </p>
+                  </div>
+                ))}
+              </section>
+
+              <section className="flex flex-col gap-5 border-t border-white/10 pt-10">
+                <h2 className="text-3xl font-bold tracking-tight">How it works</h2>
+                <p className="text-sm leading-8 opacity-60 max-w-xl font-mono">
+                  Upload a video — the brain responds in real time. Heatmap regions show predicted BOLD signal intensity across 70,000+ cortical voxels. Scroll down to see per-frame analysis with cognitive load suggestions.
+                </p>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* RIGHT: brain panel (compact) + video player */}
+        <div className="flex flex-col gap-4 flex-shrink-0" style={{ width: isExpanded ? "400px" : "460px" }}>
+
+          {/* Brain panel — hidden when expanded (brain moved to left) */}
+          {!isExpanded && (
+            <div className="relative rounded-2xl border border-white/10 bg-black overflow-hidden" style={{ height: "380px" }}>
+              {/* Expand Demo */}
+              <button
+                onClick={() => setIsExpanded(true)}
+                className="absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full border border-white/25 bg-black/70 text-[11px] tracking-widest uppercase hover:bg-white/10 transition-colors backdrop-blur-sm"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+                  <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+                Expand Demo
+              </button>
+              <button className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full border border-white/20 bg-black/60 flex flex-col items-center justify-center gap-[4px] hover:bg-white/10 transition-colors">
+                {[0,1,2].map(i => <span key={i} className="w-4 h-[1.5px] bg-white/60 rounded" />)}
+              </button>
+              <div className="absolute inset-0">
+                <RandomHeatmapBrain isActive={isPlaying} />
+              </div>
+              {/* Legend */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none">
+                <div className="flex items-center gap-3 text-[11px] tracking-widest opacity-75">
+                  <span>Low</span>
+                  <div className="w-28 h-[5px] rounded-full" style={{ background: "linear-gradient(to right,#111,#8b0000,#cc2200,#ff4500,#ff8c00,#ffd700)" }} />
+                  <span>High</span>
+                </div>
+                <span className="text-[9px] tracking-[0.3em] uppercase opacity-40">Activity</span>
+              </div>
+            </div>
+          )}
+
+          {/* Expanded-mode: collapse button + legend at top of right column */}
+          {isExpanded && (
+            <div className="flex items-center justify-between px-1">
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/25 bg-white/5 text-[11px] tracking-widest uppercase hover:bg-white/10 transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>
+                  <line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>
+                </svg>
+                Collapse
+              </button>
+              <div className="flex items-center gap-2 text-[10px] tracking-widest opacity-60">
+                <span>Low</span>
+                <div className="w-20 h-[4px] rounded-full" style={{ background: "linear-gradient(to right,#111,#8b0000,#ff4500,#ffd700)" }} />
+                <span>High</span>
+              </div>
+            </div>
+          )}
+
+          {/* Video player */}
+          <div className="rounded-2xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+            <div className="relative bg-black" style={{ aspectRatio: "16/9" }}>
+              {videoSrc ? (
+                <video ref={videoRef} src={videoSrc} className="w-full h-full object-cover" playsInline />
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white/60 transition-colors"
+                >
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <span className="text-[10px] tracking-[0.3em] uppercase">Load Video</span>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFile} />
+            </div>
+
+            <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
+              {/* Row 1 */}
+              <div className="flex items-center justify-between">
+                <CtrlBtn onClick={() => fileInputRef.current?.click()} title="Load video">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                </CtrlBtn>
+                <span className="text-[11px] tracking-widest opacity-50 font-mono">{videoSrc ? "1 / 1" : "— / —"}</span>
+                <CtrlBtn onClick={() => fileInputRef.current?.click()} title="Load video">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                </CtrlBtn>
+              </div>
+              {/* Row 2 */}
+              <div className="flex items-center justify-between">
+                <CtrlBtn onClick={togglePlay} disabled={!videoSrc}>
+                  {isPlaying
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  }
+                </CtrlBtn>
+                <CtrlBtn onClick={toggleMute} disabled={!videoSrc}>
+                  {isMuted
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  }
+                </CtrlBtn>
+                <CtrlBtn onClick={cycleSpeed} disabled={!videoSrc} wide>
+                  <span className="text-[10px] font-mono font-bold">{speed === 1 ? "1×" : speed === 1.5 ? "1.5×" : "2×"}</span>
+                </CtrlBtn>
+              </div>
+              {/* Progress */}
+              <div ref={progressRef} onClick={seekTo} className="relative w-full h-[3px] bg-white/15 rounded-full cursor-pointer">
+                <div className="absolute left-0 top-0 h-full rounded-full bg-blue-500" style={{ width: `${progress * 100}%` }} />
+                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" style={{ left: `calc(${progress * 100}% - 6px)` }} />
+              </div>
+            </div>
           </div>
 
-          <div className="absolute inset-0 w-full h-full pointer-events-auto">
-             <SolidHeatmapBrain isProcessing={isProcessing} metricsSync={metrics.score > 0} />
-          </div>
-
-          <div className="absolute bottom-6 left-6 z-20 flex gap-2 mix-blend-difference pointer-events-auto">
-             <button className="px-6 py-2 rounded-xl bg-white/10 text-white border border-white/20 text-xs font-smooch font-bold hover:bg-white hover:text-black transition-colors">True</button>
-             <button className="px-6 py-2 rounded-xl bg-white text-black border border-white text-xs font-smooch font-bold pointer-events-none">Predicted</button>
-             <div className="w-4" />
-             <button className="px-6 py-2 rounded-xl bg-white/10 text-white border border-white/20 text-xs font-smooch font-bold hover:bg-white hover:text-black transition-colors pointer-events-auto">Normal</button>
-             <button className="px-6 py-2 rounded-xl bg-white/10 text-white border border-white/20 text-xs font-smooch font-bold hover:bg-white hover:text-black transition-colors pointer-events-auto">Open</button>
-          </div>
-        </GlassPanel>
+        </div>
       </div>
 
-      {/* RIGHT PANEL: Media Target & Telemetry Data (35%) */}
-      <div className="flex-1 lg:max-w-[500px] flex flex-col gap-6">
-        
-        {/* Media Dropzone Source Block */}
-        <GlassPanel className="rounded-[2rem] bg-black/60 border border-white/20 p-6 flex flex-col relative overflow-hidden backdrop-blur-2xl">
-           <div className="flex justify-between items-center opacity-90 text-sm tracking-widest font-smooch font-bold border-b border-white/20 pb-4 mb-4">
-             <span>Simulation Target</span>
-             {media && <button onClick={clearMedia} className="text-[10px] text-red-400 hover:text-red-300 transition-colors uppercase">Clear Media X</button>}
-           </div>
+      {/* ── Frame analysis strip (scroll) ── */}
+      <AnimatePresence>
+        {(frames.length > 0 || extracting) && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full border-t border-white/10 px-10 py-14"
+          >
+            <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
+              <div className="flex items-baseline gap-4">
+                <h3 className="text-2xl font-bold uppercase tracking-widest">Frame Analysis</h3>
+                <span className="text-[10px] tracking-[0.3em] uppercase opacity-40 font-mono">Predicted BOLD · 5 keyframes</span>
+              </div>
 
-           <div className="relative w-full h-[180px] bg-[#0a0a0a] rounded-xl overflow-hidden border border-white/10 group flex items-center justify-center pointer-events-auto">
-             {media ? (
-               <>
-                 <img src={media} alt="Target" className={`w-full h-full object-cover transition-all duration-1000 ${isProcessing ? 'blur-md brightness-50' : 'brightness-100'}`} />
-                 {isProcessing && (
-                   <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40">
-                      <span className="text-xs tracking-widest animate-pulse font-bold text-white font-smooch">EXTRACTING VECTORS...</span>
-                   </div>
-                 )}
-               </>
-             ) : (
-               <label className="cursor-pointer flex flex-col items-center justify-center gap-4 w-full h-full hover:bg-white/5 transition-colors">
-                 <div className="w-12 h-12 border-2 border-dashed border-white/40 rounded-full flex items-center justify-center group-hover:border-white transition-colors">
-                   <span className="text-2xl transition-transform group-hover:scale-125">+</span>
-                 </div>
-                 <span className="text-[10px] tracking-widest opacity-60 group-hover:opacity-100 transition-opacity font-bold">Inject Media File</span>
-                 <input type="file" className="hidden" onChange={handleMediaUpload} accept="image/*,video/*" />
-               </label>
-             )}
-           </div>
+              {extracting ? (
+                <div className="flex gap-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex-1 aspect-video rounded-xl bg-white/5 animate-pulse border border-white/10" />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-5 overflow-x-auto pb-2">
+                  {frames.map((frame, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1, duration: 0.5 }}
+                      className="flex-shrink-0 w-[280px] flex flex-col gap-3"
+                    >
+                      {/* Frame thumbnail */}
+                      <div className="relative rounded-xl overflow-hidden border border-white/10">
+                        <img src={frame.dataUrl} alt={`Frame ${i + 1}`} className="w-full aspect-video object-cover" />
+                        {/* Score badge */}
+                        <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-[11px] font-mono font-bold" style={{ color: frame.suggestion.accent }}>
+                          {frame.score}%
+                        </div>
+                        {/* Timestamp */}
+                        <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-[10px] font-mono opacity-70">
+                          {frame.time.toFixed(1)}s
+                        </div>
+                      </div>
 
-           <button 
-             onClick={triggerAnalysis}
-             className="w-full py-4 mt-4 rounded-xl bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-white/90 active:scale-[0.98] transition-all shadow-lg disabled:opacity-50 disabled:active:scale-100"
-             disabled={isProcessing || !media}
-           >
-             {isProcessing ? "PROCESSING..." : "ANALYZE MEDIA"}
-           </button>
-        </GlassPanel>
-
-        {/* Global HUD Ghost Overlay Block */}
-        <GlassPanel className="rounded-[2rem] bg-black/60 border border-white/20 relative overflow-hidden backdrop-blur-2xl h-[260px] flex flex-col p-6 group pointer-events-auto">
-          <div className="absolute top-6 left-6 z-10 opacity-90 text-sm tracking-widest font-smooch font-bold pointer-events-none drop-shadow-md">Cortical Activation</div>
-          
-          <div className="absolute inset-0 w-full h-full pointer-events-none opacity-60 translate-x-[20%] scale-[1.2]">
-             <HUDHeadModel />
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="absolute bottom-6 left-6 z-10 flex flex-col gap-1 pointer-events-none drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
-             <div className="flex items-baseline gap-2">
-               <span className="text-[6rem] leading-none tracking-tighter text-white font-bold">{metrics.score > 0 ? metrics.score : "00"}</span>
-               <span className="text-2xl opacity-80">%</span>
-             </div>
-             <span className="text-xs tracking-widest font-smooch opacity-80 pl-1 uppercase text-red-400 font-bold">{isProcessing ? "Simulating..." : "Overall Impact"}</span>
-          </div>
-        </GlassPanel>
-
-        <GlassPanel className="h-[120px] rounded-[1.5rem] bg-black/60 border border-white/20 p-6 flex flex-col justify-end backdrop-blur-2xl relative overflow-hidden">
-           <div className="absolute top-4 left-6 opacity-80 text-sm tracking-widest font-smooch font-bold">Spatial Timeline</div>
-           
-           <div className="w-full flex items-end gap-[2px] h-12 relative z-10 mt-6">
-             {metrics.timeline.map((val, i) => (
-               <div key={i} className="flex-1 flex flex-col justify-end h-full">
-                 <motion.div 
-                   initial={{ height: 0 }}
-                   animate={{ height: `${metrics.score > 0 ? val : Math.random() * 5 + 5}%` }}
-                   transition={{ duration: 1, delay: i * 0.05 }}
-                   className={`w-full rounded-[1px] ${val > 80 ? 'bg-red-500 shadow-[0_0_15px_red]' : 'bg-white/20'}`}
-                 />
-               </div>
-             ))}
-           </div>
-        </GlassPanel>
-
-      </div>
+                      {/* Suggestion card */}
+                      <div className="rounded-xl border bg-black/40 p-4 flex flex-col gap-2" style={{ borderColor: `${frame.suggestion.accent}30` }}>
+                        <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: frame.suggestion.accent }}>
+                          {frame.suggestion.label}
+                        </span>
+                        <p className="text-[11px] font-mono opacity-55 leading-relaxed">
+                          {frame.suggestion.desc}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function CtrlBtn({ children, onClick, title, disabled = false, wide = false }: {
+  children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean; wide?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick} title={title} disabled={disabled}
+      className={`flex items-center justify-center rounded-full border border-white/20 bg-white/5 hover:bg-white/15 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${wide ? "w-12 h-9" : "w-9 h-9"}`}
+    >
+      {children}
+    </button>
   );
 }

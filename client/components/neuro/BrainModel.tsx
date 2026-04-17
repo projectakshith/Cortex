@@ -113,6 +113,161 @@ function RawNeuralNetworkMesh() {
 }
 
 // ----------------------------------------------------------------------------
+// RANDOM ANIMATED HEATMAP
+// ----------------------------------------------------------------------------
+
+// Maps 0-1 activation → thermal RGB (black → dark-red → red → orange → yellow)
+function thermalRGB(t: number): [number, number, number] {
+  const c = Math.max(0, Math.min(1, t));
+  if (c < 0.25) return [c * 4 * 0.55, 0, 0];
+  if (c < 0.5)  return [0.55 + (c - 0.25) * 4 * 0.45, 0, 0];
+  if (c < 0.75) return [1, (c - 0.5) * 4 * 0.55, 0];
+  return [1, 0.55 + (c - 0.75) * 4 * 0.45, (c - 0.75) * 4 * 0.3];
+}
+
+type Hotspot = { x: number; y: number; z: number; phase: number; freq: number };
+type MeshData = { attr: THREE.BufferAttribute; centroids: Float32Array; numFaces: number };
+
+function AnimatedHeatmapHemisphere({ sceneUrl, hotspots, hotspotRadius }: {
+  sceneUrl: string;
+  hotspots: Hotspot[];
+  hotspotRadius: number;
+}) {
+  const { scene } = useGLTF(sceneUrl);
+  const groupRef = useRef<THREE.Group>(null);
+  const meshData = useRef<MeshData[]>([]);
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    while (group.children.length) group.remove(group.children[0]);
+    meshData.current = [];
+
+    scene.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+      const orig = child as THREE.Mesh;
+
+      let geo = orig.geometry.clone();
+      if (geo.index) geo = geo.toNonIndexed();
+
+      const numV = geo.attributes.position.count;
+      const numFaces = Math.floor(numV / 3);
+      const pos = geo.attributes.position.array as Float32Array;
+
+      // Pre-compute face centroids
+      const centroids = new Float32Array(numFaces * 3);
+      for (let f = 0; f < numFaces; f++) {
+        const b = f * 9;
+        centroids[f * 3]     = (pos[b] + pos[b + 3] + pos[b + 6]) / 3;
+        centroids[f * 3 + 1] = (pos[b + 1] + pos[b + 4] + pos[b + 7]) / 3;
+        centroids[f * 3 + 2] = (pos[b + 2] + pos[b + 5] + pos[b + 8]) / 3;
+      }
+
+      const colorData = new Float32Array(numV * 3);
+      const attr = new THREE.BufferAttribute(colorData, 3, false);
+      attr.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute("color", attr);
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.5,
+        metalness: 0.1,
+        flatShading: true,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(orig.position);
+      mesh.rotation.copy(orig.rotation);
+      mesh.scale.copy(orig.scale);
+      group.add(mesh);
+
+      meshData.current.push({ attr, centroids, numFaces });
+    });
+
+    return () => {
+      while (group.children.length) group.remove(group.children[0]);
+      meshData.current = [];
+    };
+  }, [scene]);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const r2 = hotspotRadius * hotspotRadius * 2;
+
+    for (const { attr, centroids, numFaces } of meshData.current) {
+      const arr = attr.array as Float32Array;
+
+      for (let f = 0; f < numFaces; f++) {
+        const cx = centroids[f * 3], cy = centroids[f * 3 + 1], cz = centroids[f * 3 + 2];
+
+        // Find max activation across all hotspots (Gaussian spatial falloff × temporal pulse)
+        let maxAct = 0;
+        for (const hs of hotspots) {
+          const dx = cx - hs.x, dy = cy - hs.y, dz = cz - hs.z;
+          const dist2 = dx * dx + dy * dy + dz * dz;
+          const spatial = Math.exp(-dist2 / r2);
+          const temporal = (Math.sin(t * hs.freq + hs.phase) + 1) / 2;
+          const act = spatial * temporal;
+          if (act > maxAct) maxAct = act;
+        }
+
+        let r, g, b: number;
+        if (maxAct < 0.05) {
+          // Resting grey
+          r = g = b = 0.52;
+        } else {
+          [r, g, b] = thermalRGB(maxAct);
+        }
+
+        const base = f * 9;
+        arr[base]     = r; arr[base + 1] = g; arr[base + 2] = b;
+        arr[base + 3] = r; arr[base + 4] = g; arr[base + 5] = b;
+        arr[base + 6] = r; arr[base + 7] = g; arr[base + 8] = b;
+      }
+      attr.needsUpdate = true;
+    }
+  });
+
+  return <group ref={groupRef} />;
+}
+
+// Picks random hotspot positions from the brain mesh surface
+function useRandomHotspots(scene: THREE.Group, count: number): { hotspots: Hotspot[]; radius: number } {
+  return useMemo(() => {
+    const allCentroids: [number, number, number][] = [];
+    let maxExtent = 1;
+
+    scene.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+      const mesh = child as THREE.Mesh;
+      const geo = mesh.geometry;
+      const pos = geo.attributes.position?.array as Float32Array | undefined;
+      if (!pos) return;
+      const numV = geo.index ? geo.index.count : pos.length / 3;
+      const step = Math.max(1, Math.floor(numV / 200));
+      for (let i = 0; i < numV; i += step) {
+        const idx = geo.index ? geo.index.array[i] * 3 : i * 3;
+        const x = pos[idx], y = pos[idx + 1], z = pos[idx + 2];
+        allCentroids.push([x, y, z]);
+        const d = Math.sqrt(x * x + y * y + z * z);
+        if (d > maxExtent) maxExtent = d;
+      }
+    });
+
+    if (allCentroids.length === 0) return { hotspots: [], radius: 10 };
+
+    const radius = maxExtent * 0.22;
+    const hotspots: Hotspot[] = Array.from({ length: count }, () => {
+      const [x, y, z] = allCentroids[Math.floor(Math.random() * allCentroids.length)];
+      return { x, y, z, phase: Math.random() * Math.PI * 2, freq: 0.25 + Math.random() * 0.5 };
+    });
+
+    return { hotspots, radius };
+  }, [scene, count]);
+}
+
+// ----------------------------------------------------------------------------
 // DATA-DRIVEN HEATMAP MODEL (Meta TRIBE v2 BOLD)
 // ----------------------------------------------------------------------------
 
@@ -261,6 +416,37 @@ export function SolidHeatmapBrain({ isProcessing, metricsSync = false }: { isPro
               active={metricsSync}
             />
           </group>
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+}
+
+function RandomHeatmapScene({ isActive }: { isActive: boolean }) {
+  const leftScene = useGLTF("/models/brain-left-hemisphere-1b9f386f.glb");
+  const { hotspots, radius } = useRandomHotspots(leftScene.scene as unknown as THREE.Group, 3);
+
+  return (
+    <>
+      <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={isActive ? 2.0 : 0.8} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 1.5} />
+      <group scale={0.3} position={[0, -5, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <AnimatedHeatmapHemisphere sceneUrl="/models/brain-left-hemisphere-1b9f386f.glb"  hotspots={isActive ? hotspots : []} hotspotRadius={radius} />
+        <AnimatedHeatmapHemisphere sceneUrl="/models/brain-right-hemisphere-f0dea562.glb" hotspots={isActive ? hotspots : []} hotspotRadius={radius} />
+      </group>
+    </>
+  );
+}
+
+export function RandomHeatmapBrain({ isActive = false }: { isActive?: boolean }) {
+  return (
+    <div className="w-full h-full cursor-grab active:cursor-grabbing">
+      <Canvas camera={{ position: [0, 0, 100], fov: 45 }} gl={{ antialias: true, alpha: true }}>
+        <ambientLight intensity={1.5} />
+        <spotLight position={[100, 100, 100]} angle={0.3} penumbra={1} intensity={6} color="#ffffff" castShadow />
+        <spotLight position={[-100, -10, 50]} angle={0.3} penumbra={1} intensity={3} color="#ffffff" />
+        <Environment preset="city" />
+        <Suspense fallback={null}>
+          <RandomHeatmapScene isActive={isActive} />
         </Suspense>
       </Canvas>
     </div>
