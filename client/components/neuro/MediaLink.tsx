@@ -937,15 +937,15 @@ export function MediaLink() {
           <Section>
             <div className="flex gap-10 items-start">
               {/* text */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-shrink-0 w-[340px]">
                 <span className="text-[10px] tracking-[0.5em] uppercase opacity-40 text-orange-400 mb-3 block">Use Case</span>
                 <h2 className="text-3xl font-bold tracking-tight mb-5">Built for ads &amp; content</h2>
                 <p className="text-sm leading-8 opacity-60 font-mono">
                   Every frame of a video ad fires specific neural circuits. Cortex simulates those circuits before a single dollar of media spend is committed. Upload a 30-second spot and receive voxel-level predictions of where viewer attention will spike, collapse, or trigger decision fatigue.
                 </p>
               </div>
-              {/* cards on the right */}
-              <div className="grid grid-cols-2 gap-3 flex-shrink-0 w-[360px]">
+              {/* cards expand to fill remaining left-column space */}
+              <div className="grid grid-cols-2 gap-3 flex-1 min-w-0">
               {[
                 { icon: "◉", title: "Pre-flight validation",  body: "Score creative against 1,100h of fMRI ground-truth before launch." },
                 { icon: "⊕", title: "Frame-level edits",      body: "Pinpoint the exact window causing attention dropout and fix it." },

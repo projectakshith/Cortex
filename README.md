@@ -244,3 +244,4 @@ pip install -r requirements.txt
 CPU inference works but will be significantly slower and may hit the 30s timeout, triggering the ResNet fallback.
 
 
+
